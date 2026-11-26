@@ -21,13 +21,17 @@ preview_bucket_name = "tavelle-files-preview"
 
 [vars]
 ENVIRONMENT = "development"
+BETTER_AUTH_URL = "http://127.0.0.1:5173"
+# Comma-separated platform operator emails (org provisioning). Override in .dev.vars.
+PLATFORM_ADMIN_EMAILS = ""
 
 # --- staging (workers.dev) ---
 # One Worker serves /api/* and SPA assets (same-origin cookies).
 # Build web first: `pnpm --filter @tavelle/web build`
+# Secrets (do not put in vars): BETTER_AUTH_SECRET via `wrangler secret put`
 [env.staging]
 name = "tavelle-api-staging"
-vars = { ENVIRONMENT = "staging" }
+vars = { ENVIRONMENT = "staging", BETTER_AUTH_URL = "https://tavelle-api-staging.ukbu88.workers.dev", PLATFORM_ADMIN_EMAILS = "ukbu88@proton.me" }
 
 [[env.staging.d1_databases]]
 binding = "DB"

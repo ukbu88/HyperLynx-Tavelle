@@ -4,7 +4,7 @@ HyperLynx multi-tenant CRM and client portal — modular monolith on Cloudflare 
 
 First operational user is the Dispatch Sites business wing; **do not hardcode Dispatch Sites branding** into app core (org branding/config later).
 
-Phase 0 planning docs live in [`docs/`](./docs/). This repo scaffold is **Phase 1 foundation**: clone → install → local run, Worker deploy path, D1 + R2 bindings, CI basics. Identity/CRM product features come next.
+Phase 0 planning docs live in [`docs/`](./docs/). This branch adds **identity & tenancy**: Better Auth (password + magic link), invite-only orgs, memberships, permissions, and TenantContext enforcement.
 
 ## Prerequisites
 
@@ -18,6 +18,7 @@ Phase 0 planning docs live in [`docs/`](./docs/). This repo scaffold is **Phase 
 git clone https://github.com/ukbu88/HyperLynx-Tavelle.git
 cd HyperLynx-Tavelle
 pnpm install
+cp apps/api/.dev.vars.example apps/api/.dev.vars   # set PLATFORM_ADMIN_EMAILS + secret
 pnpm db:migrate:local
 pnpm dev
 ```
@@ -26,7 +27,8 @@ pnpm dev
 |---------|-----|
 | Web (Vite) | http://127.0.0.1:5173 |
 | API (Wrangler) | http://127.0.0.1:8787 |
-| Health | http://127.0.0.1:5173/api/health (proxied) or :8787/api/health |
+| Sign in | http://127.0.0.1:5173/sign-in |
+| Health | http://127.0.0.1:5173/api/health (proxied) |
 
 Useful scripts:
 
@@ -36,8 +38,16 @@ Useful scripts:
 | `pnpm db:generate` | Drizzle Kit → SQL migrations |
 | `pnpm db:migrate:local` | Apply migrations to local D1 |
 | `pnpm typecheck` | `tsc` across packages |
-| `pnpm test` | Vitest |
+| `pnpm test` | Vitest (incl. permission helper) |
 | `pnpm deploy:staging` | Build SPA + `wrangler deploy --env staging` |
+
+## Auth & tenancy
+
+- **Accounts:** Better Auth email/password + magic link (`/api/auth/*`)
+- **Orgs:** invite-only provisioning via `PLATFORM_ADMIN_EMAILS` (no public self-serve org signup)
+- **Staff invites:** hashed tokens; accept at `/accept-invite` (URL also logged when email is stubbed)
+- **TenantContext:** active org cookie verified against memberships on every org-scoped request
+- Spike notes + fallback: [`docs/AUTH-SPIKE.md`](./docs/AUTH-SPIKE.md)
 
 ## Environment
 
@@ -49,65 +59,33 @@ Useful scripts:
 
 ```
 apps/
-  api/          # Hono on Cloudflare Workers
-  web/          # React + Vite SPA (shell stub)
+  api/          # Hono on Cloudflare Workers (identity, orgs, memberships, notes)
+  web/          # React + Vite SPA (auth + workspace shell)
 packages/
-  contracts/    # Zod schemas + shared types
+  contracts/    # Zod schemas + permission helpers
   db/           # Drizzle schema + migrations
   config/       # shared tsconfig bases
-docs/           # Phase 0 product/architecture (source of truth in-repo)
-tooling/scripts/
+docs/           # Phase 0 product/architecture + AUTH-SPIKE / DEPLOY
 ```
 
 ## Cloudflare deploy (staging / workers.dev)
 
-Remote deploy needs **your** Cloudflare credentials. This cloud agent does **not** have them; do not paste tokens into chat.
-
 Full checklist: [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
-### One-time setup (Prince)
+Staging: https://tavelle-api-staging.ukbu88.workers.dev
 
-1. Install Wrangler globally or use the workspace binary:
-   ```bash
-   pnpm --filter @tavelle/api exec wrangler --version
-   ```
-2. Authenticate (pick one):
-   ```bash
-   pnpm --filter @tavelle/api exec wrangler login
-   ```
-   **or** create an API token with Workers/D1/R2 permissions and export in your shell / GitHub Actions secrets:
-   ```bash
-   export CLOUDFLARE_API_TOKEN=…   # set locally or in CI — do not commit
-   export CLOUDFLARE_ACCOUNT_ID=…
-   ```
-3. Create resources:
-   ```bash
-   cd apps/api
-   pnpm exec wrangler d1 create tavelle-staging
-   pnpm exec wrangler r2 bucket create tavelle-files-staging
-   ```
-4. Paste the returned D1 `database_id` into `apps/api/wrangler.toml` under `[env.staging]` (`REPLACE_WITH_STAGING_D1_ID`).
-5. Build + migrate + deploy:
-   ```bash
-   pnpm --filter @tavelle/web build
-   pnpm db:migrate:remote   # D1 name: tavelle-staging (--env staging)
-   pnpm deploy:staging
-   ```
-6. Confirm `https://tavelle-api-staging.<your-subdomain>.workers.dev/api/health`.
+```bash
+pnpm --filter @tavelle/web build
+pnpm db:migrate:remote
+# once: pnpm --filter @tavelle/api exec wrangler secret put BETTER_AUTH_SECRET --env staging
+pnpm deploy:staging
+```
 
-Custom domains come later; use `workers.dev` for now.
+## Prince follow-ups
 
-### Deploy status from this agent
-
-**Blocked:** no `CLOUDFLARE_API_TOKEN` / Wrangler login in the agent environment. Local path and CI are implementable without it.
-
-## Auth / secrets blockers (later Phase 1)
-
-Not wired in this foundation PR. When identity lands:
-
-- `BETTER_AUTH_SECRET` via `wrangler secret put`
-- Email provider key when magic links leave the log-stub
-- Prefer same-origin `/api` cookies (already the deploy shape)
+1. Confirm / rotate `BETTER_AUTH_SECRET` on staging (`wrangler secret put`).  
+2. Choose email provider (Resend/Postmark) and set `EMAIL_API_KEY` + `EMAIL_FROM` — until then magic/invite links are Worker-logged.  
+3. Keep `PLATFORM_ADMIN_EMAILS` accurate.
 
 ## CI
 

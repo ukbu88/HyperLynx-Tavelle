@@ -8,8 +8,9 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
+        // Keep Host as the Vite origin so Better Auth cookies bind to :5173.
         target: "http://127.0.0.1:8787",
-        changeOrigin: true,
+        changeOrigin: false,
       },
     },
   },

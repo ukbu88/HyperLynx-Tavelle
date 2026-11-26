@@ -1,2 +1,12 @@
-# Local Wrangler secrets (copy to .dev.vars — gitignored).
-# ENVIRONMENT=development
+# Copy to .dev.vars (gitignored). Never commit real secrets.
+
+ENVIRONMENT=development
+BETTER_AUTH_URL=http://127.0.0.1:5173
+BETTER_AUTH_SECRET=dev-only-tavelle-better-auth-secret-change-me
+
+# Comma-separated emails allowed to provision organisations (invite-only ops).
+PLATFORM_ADMIN_EMAILS=you@example.com
+
+# Optional transactional email — leave unset to log magic/invite links.
+# EMAIL_FROM=noreply@example.com
+# EMAIL_API_KEY=

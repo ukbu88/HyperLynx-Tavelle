@@ -110,6 +110,10 @@ Before building CRM tables, prove:
 
 If Better Auth fails the spike within a short timebox, switch to fallback without rewriting product architecture.
 
+### Spike outcome (2026-11-26, Australia/Brisbane)
+
+**Passed** on Workers + D1. See [AUTH-SPIKE.md](../AUTH-SPIKE.md). Fallback path remains Auth.js / thin session behind `identity` only if a future regression forces a swap — ADR status stays ACCEPTED (Better Auth).
+
 ---
 
 ## Consequences
