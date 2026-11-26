@@ -492,6 +492,28 @@ body {
   color: var(--ink-3);
 }
 
+.workspace-subhead {
+  margin: var(--s-6) 0 var(--s-3);
+  font-family: var(--font-sans);
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.auth-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  font-size: var(--t-small);
+  color: var(--ink-2);
+}
+
+.shell__tagline code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
 .org-list,
 .note-list {
   list-style: none;

@@ -1,4 +1,10 @@
-import type { MeResponse, WorkspaceNote } from "@tavelle/contracts";
+import type {
+  ClientNote,
+  Contact,
+  Customer,
+  MeResponse,
+  WorkspaceNote,
+} from "@tavelle/contracts";
 
 async function api<T>(
   path: string,
@@ -86,5 +92,62 @@ export function createNote(body: string) {
   return api<WorkspaceNote>("/api/notes", {
     method: "POST",
     body: JSON.stringify({ body }),
+  });
+}
+
+export function listCustomers() {
+  return api<{ op: string; customers: Customer[] }>("/api/customers");
+}
+
+export function createCustomer(input: { name: string; status?: string }) {
+  return api<{ op: string; customer: Customer }>("/api/customers", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateCustomer(
+  id: string,
+  input: { name?: string; status?: string },
+) {
+  return api<{ op: string; customer: Customer }>(`/api/customers/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getCustomer(id: string) {
+  return api<{ op: string; customer: Customer }>(`/api/customers/${id}`);
+}
+
+export function listContacts(customerId: string) {
+  return api<{ op: string; contacts: Contact[] }>(
+    `/api/customers/${customerId}/contacts`,
+  );
+}
+
+export function createContact(input: {
+  clientId: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  isPrimary?: boolean;
+}) {
+  return api<{ op: string; contact: Contact }>("/api/contacts", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function listClientNotes(customerId: string) {
+  return api<{ op: string; notes: ClientNote[] }>(
+    `/api/customers/${customerId}/notes`,
+  );
+}
+
+export function createClientNote(input: { clientId: string; body: string }) {
+  return api<{ op: string; note: ClientNote }>("/api/client-notes", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }

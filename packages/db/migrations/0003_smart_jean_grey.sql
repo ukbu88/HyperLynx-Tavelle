@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `contacts_one_primary_uidx` ON `contacts` (`org_id`,`client_id`) WHERE "contacts"."is_primary" = 1;
