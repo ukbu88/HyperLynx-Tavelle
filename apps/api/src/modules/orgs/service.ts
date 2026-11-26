@@ -10,6 +10,10 @@ import {
 import type { CreateOrganisationInput } from "@tavelle/contracts";
 import { newId } from "../../lib/ids.js";
 import type { Env } from "../../env.js";
+import {
+  ensureBusiness,
+  ensureModuleEnabled,
+} from "../businesses/service.js";
 
 export function getDb(env: Env): TavelleDb {
   return createDb(env.DB);
@@ -41,10 +45,23 @@ export async function listMembershipsForUser(db: TavelleDb, userId: string) {
   }));
 }
 
+export type ProvisionOrganisationOptions = {
+  /**
+   * Initial business workspaces. Default: one workspace named after the org
+   * (`slug: "default"`) with CRM enabled so TenantContext has a businessId.
+   */
+  businesses?: Array<{ name: string; slug: string }>;
+};
+
+/**
+ * Invite-only org create: membership + branding + at least one business workspace.
+ * CRM module is enabled on each initial business.
+ */
 export async function provisionOrganisation(
   db: TavelleDb,
   input: CreateOrganisationInput,
   ownerUserId: string,
+  options?: ProvisionOrganisationOptions,
 ) {
   const orgId = newId();
   const now = new Date();
@@ -74,7 +91,22 @@ export async function provisionOrganisation(
     createdAt: now,
   });
 
-  return { orgId };
+  const initialBusinesses =
+    options?.businesses ??
+    [{ name: input.displayName ?? input.name, slug: "default" }];
+
+  const createdBusinesses: { id: string; name: string; slug: string }[] = [];
+  for (const biz of initialBusinesses) {
+    const row = await ensureBusiness(db, orgId, biz);
+    await ensureModuleEnabled(db, orgId, row.id, "crm");
+    createdBusinesses.push({ id: row.id, name: row.name, slug: row.slug });
+  }
+
+  return {
+    orgId,
+    businessId: createdBusinesses[0]?.id ?? null,
+    businesses: createdBusinesses,
+  };
 }
 
 export async function findUserIdByEmail(db: TavelleDb, email: string) {

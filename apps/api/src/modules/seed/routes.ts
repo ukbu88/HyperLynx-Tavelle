@@ -107,7 +107,9 @@ seedRoutes.post("/seed/hyperlynx", async (c) => {
     await ensureMembership(db, orgId, user.id);
     await ensureOrgBranding(db, orgId, HYPERLYNX.displayName);
   } else {
-    const provisioned = await provisionOrganisation(db, HYPERLYNX, user.id);
+    const provisioned = await provisionOrganisation(db, HYPERLYNX, user.id, {
+      businesses: [...HYPERLYNX_BUSINESSES],
+    });
     orgId = provisioned.orgId;
   }
 
@@ -174,7 +176,9 @@ seedRoutes.post("/seed/demo-orgs", async (c) => {
     await ensureMembership(db, orgId, user.id);
     await ensureOrgBranding(db, orgId, HYPERLYNX.displayName);
   } else {
-    const provisioned = await provisionOrganisation(db, HYPERLYNX, user.id);
+    const provisioned = await provisionOrganisation(db, HYPERLYNX, user.id, {
+      businesses: [...HYPERLYNX_BUSINESSES],
+    });
     orgId = provisioned.orgId;
   }
 
@@ -183,7 +187,7 @@ seedRoutes.post("/seed/demo-orgs", async (c) => {
     await ensureModuleEnabled(db, orgId, row.id, "crm");
   }
 
-  // Keep a second org for isolation demos (no businesses required).
+  // Second org for isolation demos (gets a default business via provisionOrganisation).
   const alphaSlug = "demo-tenant-alpha";
   const alphaExisting = await db
     .select()

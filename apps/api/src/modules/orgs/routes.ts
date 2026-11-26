@@ -85,12 +85,20 @@ orgRoutes.post("/orgs", async (c) => {
 
   const db = getDb(c.env);
   try {
-    const { orgId } = await provisionOrganisation(db, parsed.data, user.id);
+    const { orgId, businessId, businesses } = await provisionOrganisation(
+      db,
+      parsed.data,
+      user.id,
+    );
     const opts = cookieOpts(c.env);
     setCookie(c, ACTIVE_ORG_COOKIE, orgId, opts);
-    // New org has no businesses yet — clear stale business cookie.
-    setCookie(c, ACTIVE_BUSINESS_COOKIE, "", { ...opts, maxAge: 0 });
-    return c.json({ orgId }, 201);
+    // Default business is created with the org — activate it for CRM.
+    if (businessId) {
+      setCookie(c, ACTIVE_BUSINESS_COOKIE, businessId, opts);
+    } else {
+      setCookie(c, ACTIVE_BUSINESS_COOKIE, "", { ...opts, maxAge: 0 });
+    }
+    return c.json({ orgId, businessId, businesses }, 201);
   } catch (err) {
     console.error("org_provision_failed", c.get("requestId"), err);
     return c.json({ error: "provision_failed" }, 500);

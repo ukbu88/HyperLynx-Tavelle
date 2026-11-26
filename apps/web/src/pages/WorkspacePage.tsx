@@ -97,12 +97,18 @@ export function WorkspacePage() {
         return;
       }
       setMe(meRes.data);
-      if (meRes.data.activeOrgId && meRes.data.activeBusinessId) {
-        const [notesRes, customersRes] = await Promise.all([
-          listNotes(),
-          listCustomers(),
-        ]);
+
+      // Workspace notes are org-scoped — load whenever an org is active.
+      if (meRes.data.activeOrgId) {
+        const notesRes = await listNotes();
         if (notesRes.ok) setNotes(notesRes.data.notes);
+      } else {
+        setNotes([]);
+      }
+
+      // CRM customers require an active business workspace.
+      if (meRes.data.activeOrgId && meRes.data.activeBusinessId) {
+        const customersRes = await listCustomers();
         if (customersRes.ok) {
           setCustomers(customersRes.data.customers);
           const wantId = preferCustomerId ?? selectedCustomerIdRef.current;
@@ -124,7 +130,6 @@ export function WorkspacePage() {
           clearCustomerDetails();
         }
       } else {
-        setNotes([]);
         setCustomers([]);
         selectCustomerId(null);
         clearCustomerDetails();
@@ -575,7 +580,11 @@ export function WorkspacePage() {
                 </ul>
               </section>
             )}
+          </>
+        )}
 
+        {me?.activeOrgId && (
+          <>
             <section className="workspace-section">
               <h2>Invite staff</h2>
               <form
