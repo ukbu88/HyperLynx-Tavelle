@@ -3,6 +3,7 @@ import { z } from "zod";
 /**
  * Explicit domain ops — interface-independent contracts.
  * HTTP / future channels bind to these names; UI is not the source of truth.
+ * Customers / contacts are scoped to active org + active business.
  */
 export const CustomerOps = {
   create: "customers.create",
@@ -28,6 +29,7 @@ export type CustomerStatus = z.infer<typeof CustomerStatusSchema>;
 export const CustomerSchema = z.object({
   id: z.string(),
   orgId: z.string(),
+  businessId: z.string(),
   name: z.string(),
   status: CustomerStatusSchema,
   createdAt: z.string(),
@@ -50,6 +52,7 @@ export type CustomersUpdateInput = z.infer<typeof CustomersUpdateInputSchema>;
 export const ContactSchema = z.object({
   id: z.string(),
   orgId: z.string(),
+  businessId: z.string(),
   clientId: z.string(),
   name: z.string(),
   email: z.string().nullable(),
@@ -80,6 +83,7 @@ export type ContactsUpdateInput = z.infer<typeof ContactsUpdateInputSchema>;
 export const ClientNoteSchema = z.object({
   id: z.string(),
   orgId: z.string(),
+  businessId: z.string(),
   clientId: z.string(),
   body: z.string(),
   authorUserId: z.string().nullable(),
@@ -96,6 +100,7 @@ export type ClientNotesCreateInput = z.infer<typeof ClientNotesCreateInputSchema
 export const ActivityEventSchema = z.object({
   id: z.string(),
   orgId: z.string(),
+  businessId: z.string().nullable(),
   actorUserId: z.string().nullable(),
   action: z.string(),
   entityType: z.string(),

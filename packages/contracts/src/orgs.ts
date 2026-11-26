@@ -67,6 +67,19 @@ export const MeResponseSchema = z.object({
     }),
   ),
   activeOrgId: z.string().nullable(),
+  /** Active business workspace within the active org (server-resolved). */
+  activeBusinessId: z.string().nullable(),
+  businesses: z
+    .array(
+      z.object({
+        id: z.string(),
+        orgId: z.string(),
+        name: z.string(),
+        slug: z.string(),
+        status: z.string(),
+      }),
+    )
+    .default([]),
   isPlatformAdmin: z.boolean(),
 });
 export type MeResponse = z.infer<typeof MeResponseSchema>;

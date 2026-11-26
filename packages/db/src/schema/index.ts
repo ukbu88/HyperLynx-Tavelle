@@ -18,6 +18,10 @@ export {
   type StaffRole,
 } from "./orgs.js";
 export {
+  businesses,
+  businessModuleConfig,
+} from "./businesses.js";
+export {
   clients,
   contacts,
   clientNotes,

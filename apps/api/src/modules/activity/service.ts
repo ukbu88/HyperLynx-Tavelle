@@ -20,6 +20,7 @@ export async function recordActivity(
   await db.insert(activityEvents).values({
     id,
     orgId: tenant.orgId,
+    businessId: tenant.businessId,
     actorUserId: tenant.actorUserId,
     action: input.action,
     entityType: input.entityType,

@@ -23,10 +23,17 @@ export type AppSessionUser = {
 
 export type TenantContext = {
   orgId: string;
+  /** Active business workspace — null when org has no businesses yet. */
+  businessId: string | null;
   actorUserId: string;
   actorKind: "staff";
   role: "owner" | "admin" | "member" | "viewer";
   clientId?: string;
+};
+
+/** Tenant with a resolved business — required for CRM domain ops. */
+export type BusinessTenantContext = TenantContext & {
+  businessId: string;
 };
 
 export type AppVariables = {

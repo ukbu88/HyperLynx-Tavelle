@@ -7,11 +7,12 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { organisations } from "./orgs.js";
+import { businesses } from "./businesses.js";
 import { user } from "./auth.js";
 
 /**
  * CRM clients (domain op surface: customers.*).
- * Soft-delete via deleted_at; always query with org_id from TenantContext.
+ * Soft-delete via deleted_at; always query with org_id + business_id from TenantContext.
  */
 export const clients = sqliteTable(
   "clients",
@@ -20,6 +21,9 @@ export const clients = sqliteTable(
     orgId: text("org_id")
       .notNull()
       .references(() => organisations.id, { onDelete: "cascade" }),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     status: text("status").notNull().default("active"),
     deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
@@ -31,7 +35,10 @@ export const clients = sqliteTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("clients_org_idx").on(table.orgId)],
+  (table) => [
+    index("clients_org_idx").on(table.orgId),
+    index("clients_org_business_idx").on(table.orgId, table.businessId),
+  ],
 );
 
 export const contacts = sqliteTable(
@@ -41,6 +48,9 @@ export const contacts = sqliteTable(
     orgId: text("org_id")
       .notNull()
       .references(() => organisations.id, { onDelete: "cascade" }),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
     clientId: text("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
@@ -60,6 +70,7 @@ export const contacts = sqliteTable(
   },
   (table) => [
     index("contacts_org_idx").on(table.orgId),
+    index("contacts_org_business_idx").on(table.orgId, table.businessId),
     index("contacts_org_client_idx").on(table.orgId, table.clientId),
     // At most one primary contact per customer (SQLite partial unique index).
     uniqueIndex("contacts_one_primary_uidx")
@@ -76,6 +87,9 @@ export const clientNotes = sqliteTable(
     orgId: text("org_id")
       .notNull()
       .references(() => organisations.id, { onDelete: "cascade" }),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
     clientId: text("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
@@ -93,6 +107,7 @@ export const clientNotes = sqliteTable(
   },
   (table) => [
     index("client_notes_org_idx").on(table.orgId),
+    index("client_notes_org_business_idx").on(table.orgId, table.businessId),
     index("client_notes_org_client_idx").on(table.orgId, table.clientId),
   ],
 );
@@ -105,6 +120,9 @@ export const activityEvents = sqliteTable(
     orgId: text("org_id")
       .notNull()
       .references(() => organisations.id, { onDelete: "cascade" }),
+    businessId: text("business_id").references(() => businesses.id, {
+      onDelete: "set null",
+    }),
     actorUserId: text("actor_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
@@ -118,5 +136,10 @@ export const activityEvents = sqliteTable(
   },
   (table) => [
     index("activity_events_org_created_idx").on(table.orgId, table.createdAt),
+    index("activity_events_org_business_created_idx").on(
+      table.orgId,
+      table.businessId,
+      table.createdAt,
+    ),
   ],
 );
