@@ -53,52 +53,75 @@ export function Shell() {
   }, []);
 
   return (
-    <div className="shell">
-      <header className="shell__brand">
-        <p className="shell__eyebrow">HyperLynx</p>
-        <h1 className="shell__title">Tavelle</h1>
-        <p className="shell__tagline">
-          Multi-tenant CRM and client portal foundation. Branding hooks land
-          later — no tenant logos hardcoded here.
-        </p>
+    <>
+      <header className="shell-header">
+        <div className="shell-header__inner">
+          <a className="shell-header__lockup" href="/" aria-label="Tavelle home">
+            <span className="shell-header__mark" aria-hidden="true" />
+            <span className="shell-header__wordmark">Tavelle</span>
+          </a>
+          <nav className="shell-header__nav" aria-label="Shell">
+            <span className="shell-header__link" aria-current="page">
+              Status
+            </span>
+          </nav>
+        </div>
       </header>
 
-      <section className="shell__status" aria-live="polite">
-        <h2>API status</h2>
-        {state.status === "loading" && <p>Checking /api/health…</p>}
-        {state.status === "error" && (
-          <p className="shell__error">
-            Could not reach the API ({state.detail}). Start with{" "}
-            <code>pnpm dev</code> so Vite proxies to Wrangler on :8787.
+      <main className="shell">
+        <header className="shell__intro">
+          <p className="shell__eyebrow">HyperLynx</p>
+          <h1 className="shell__title">Foundation shell</h1>
+          <p className="shell__tagline">
+            Multi-tenant CRM and client portal foundation. Branding hooks land
+            later — no tenant logos hardcoded here.
           </p>
-        )}
-        {state.status === "ok" && (
-          <dl className="shell__meta">
-            <div>
-              <dt>Hello</dt>
-              <dd>{state.hello.message}</dd>
-            </div>
-            <div>
-              <dt>Environment</dt>
-              <dd>{state.hello.environment}</dd>
-            </div>
-            <div>
-              <dt>D1</dt>
-              <dd>{state.health.bindings.d1 ? "bound" : "unavailable"}</dd>
-            </div>
-            <div>
-              <dt>R2</dt>
-              <dd>{state.health.bindings.r2 ? "bound" : "unavailable"}</dd>
-            </div>
-            <div>
-              <dt>Request</dt>
-              <dd>
-                <code>{state.hello.requestId}</code>
-              </dd>
-            </div>
-          </dl>
-        )}
-      </section>
-    </div>
+        </header>
+
+        <section className="shell__status" aria-live="polite">
+          <h2>API status</h2>
+          {state.status === "loading" && (
+            <p className="shell__loading">Checking /api/health…</p>
+          )}
+          {state.status === "error" && (
+            <p className="shell__error">
+              Could not reach the API ({state.detail}). Start with{" "}
+              <code className="shell__hint-link">pnpm dev</code> so Vite proxies
+              to Wrangler on :8787.
+            </p>
+          )}
+          {state.status === "ok" && (
+            <dl className="shell__meta">
+              <div>
+                <dt>Hello</dt>
+                <dd>{state.hello.message}</dd>
+              </div>
+              <div>
+                <dt>Environment</dt>
+                <dd>{state.hello.environment}</dd>
+              </div>
+              <div>
+                <dt>D1</dt>
+                <dd data-bound={String(state.health.bindings.d1)}>
+                  {state.health.bindings.d1 ? "bound" : "unavailable"}
+                </dd>
+              </div>
+              <div>
+                <dt>R2</dt>
+                <dd data-bound={String(state.health.bindings.r2)}>
+                  {state.health.bindings.r2 ? "bound" : "unavailable"}
+                </dd>
+              </div>
+              <div>
+                <dt>Request</dt>
+                <dd>
+                  <code>{state.hello.requestId}</code>
+                </dd>
+              </div>
+            </dl>
+          )}
+        </section>
+      </main>
+    </>
   );
 }
