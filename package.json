@@ -1,0 +1,33 @@
+{
+  "name": "tavelle",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Tavelle — HyperLynx multi-tenant CRM / client portal (modular monolith)",
+  "packageManager": "pnpm@10.33.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @tavelle/api --filter @tavelle/web dev",
+    "dev:api": "pnpm --filter @tavelle/api dev",
+    "dev:web": "pnpm --filter @tavelle/web dev",
+    "build": "pnpm -r --filter @tavelle/contracts --filter @tavelle/db --filter @tavelle/web --filter @tavelle/api build",
+    "typecheck": "pnpm -r --filter @tavelle/contracts --filter @tavelle/db --filter @tavelle/api --filter @tavelle/web typecheck",
+    "test": "pnpm -r --filter @tavelle/api --filter @tavelle/contracts test",
+    "lint": "pnpm -r --filter @tavelle/api --filter @tavelle/web --filter @tavelle/contracts --filter @tavelle/db lint",
+    "db:generate": "pnpm --filter @tavelle/db generate",
+    "db:migrate:local": "pnpm --filter @tavelle/api db:migrate:local",
+    "db:migrate:remote": "pnpm --filter @tavelle/api db:migrate:remote",
+    "deploy:staging": "pnpm --filter @tavelle/web build && pnpm --filter @tavelle/api deploy:staging"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "sharp"
+    ]
+  }
+}

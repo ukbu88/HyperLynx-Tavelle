@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+apps/api/.dev.vars
+.dev.vars
+
+# Wrangler / Cloudflare
+.wrangler/
+.mf/
+cloudflare-env.d.ts
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Logs / coverage
+logs/
+*.log
+coverage/
+.nyc_output/
+
+# Vite
+apps/web/dist/
