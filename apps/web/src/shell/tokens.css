@@ -1,0 +1,76 @@
+/**
+ * HyperLynx → Tavelle design tokens
+ * Source: HyperLynxFinal tokens.css (adapted for SPA workspace shell)
+ * Branding hook: override --signal / --highlight per org later.
+ */
+
+:root {
+  /* Colour — ~90% paper / 9% ink / <1% signal */
+  --paper: #f7f7f4;
+  --canvas: var(--paper);
+  --white: #ffffff;
+  --ink: #14161a;
+  --ink-2: #4a4f57;
+  --ink-3: #6c717a;
+  --line: rgb(20 22 26 / 0.12);
+  --line-strong: rgb(20 22 26 / 0.24);
+  --signal: #e0461c;
+  --highlight: #e8590c;
+  --danger: #b42318;
+
+  /* Registered Space (available; not default chrome) */
+  --mist: #ebeeed;
+  --glass: #cdd5d5;
+  --steel: #89999f;
+  --slate: #52656b;
+
+  /* Type faces (wired via index.html / CSS vars) */
+  --font-instrument: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-plex-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans: var(--font-instrument);
+  --font-mono: var(--font-plex-mono);
+
+  /* Type scale — compress display for app UI */
+  --t-display-m: clamp(2rem, 3.6vw, 3.25rem);
+  --t-title: clamp(1.375rem, 1.9vw, 1.75rem);
+  --t-body-l: clamp(1.125rem, 1.35vw, 1.3125rem);
+  --t-body: 1.0625rem;
+  --t-small: 0.875rem;
+  --t-mono: 0.75rem;
+
+  /* Space */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --gutter: clamp(16px, 4vw, 56px);
+  --max: 1440px;
+  --header-h: 64px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --header-total: calc(var(--header-h) + var(--safe-top));
+  --radius: 2px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 0.84, 0.24, 1);
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-std: cubic-bezier(0.3, 0, 0.2, 1);
+  --d-fast: 160ms;
+  --t-quick: 160ms;
+  --t-base: 280ms;
+  --t-slow: 520ms;
+  --t-arrive: 760ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --d-fast: 0.01ms;
+    --t-quick: 0.01ms;
+    --t-base: 0.01ms;
+    --t-slow: 0.01ms;
+    --t-arrive: 0.01ms;
+  }
+}
