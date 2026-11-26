@@ -4,6 +4,7 @@ import {
   integer,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { organisations } from "./orgs.js";
 import { user } from "./auth.js";
@@ -60,6 +61,10 @@ export const contacts = sqliteTable(
   (table) => [
     index("contacts_org_idx").on(table.orgId),
     index("contacts_org_client_idx").on(table.orgId, table.clientId),
+    // At most one primary contact per customer (SQLite partial unique index).
+    uniqueIndex("contacts_one_primary_uidx")
+      .on(table.orgId, table.clientId)
+      .where(sql`${table.isPrimary} = 1`),
   ],
 );
 

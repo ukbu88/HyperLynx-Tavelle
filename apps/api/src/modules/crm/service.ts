@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import {
   clientNotes,
   clients,
@@ -19,6 +19,14 @@ import { recordActivity } from "../activity/service.js";
 
 function notDeleted() {
   return isNull(clients.deletedAt);
+}
+
+function isUniqueConstraintError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    message.includes("UNIQUE constraint failed") ||
+    message.includes("contacts_one_primary_uidx")
+  );
 }
 
 export async function listCustomers(db: TavelleDb, tenant: TenantContext) {
@@ -126,23 +134,6 @@ export async function updateCustomer(
   };
 }
 
-async function clearPrimaryContacts(
-  db: TavelleDb,
-  tenant: TenantContext,
-  clientId: string,
-) {
-  await db
-    .update(contacts)
-    .set({ isPrimary: false, updatedAt: new Date() })
-    .where(
-      and(
-        eq(contacts.orgId, tenant.orgId),
-        eq(contacts.clientId, clientId),
-        eq(contacts.isPrimary, true),
-      ),
-    );
-}
-
 export async function listContactsForCustomer(
   db: TavelleDb,
   tenant: TenantContext,
@@ -176,7 +167,11 @@ export async function getContactInTenant(
     .get();
 }
 
-/** Domain op: contacts.create — one primary contact per customer. */
+/**
+ * Domain op: contacts.create — one primary contact per customer.
+ * Demotion + insert run in a single D1 batch (atomic); partial unique index
+ * enforces the invariant under concurrency.
+ */
 export async function createContact(
   db: TavelleDb,
   tenant: TenantContext,
@@ -185,23 +180,44 @@ export async function createContact(
   const customer = await getCustomerInTenant(db, tenant, input.clientId);
   if (!customer) return { error: "customer_not_found" as const };
 
-  if (input.isPrimary) {
-    await clearPrimaryContacts(db, tenant, input.clientId);
-  }
-
   const id = newId();
   const now = new Date();
-  await db.insert(contacts).values({
+  const isPrimary = input.isPrimary ?? false;
+
+  const insert = db.insert(contacts).values({
     id,
     orgId: tenant.orgId,
     clientId: input.clientId,
     name: input.name,
     email: input.email ?? null,
     phone: input.phone ?? null,
-    isPrimary: input.isPrimary ?? false,
+    isPrimary,
     createdAt: now,
     updatedAt: now,
   });
+
+  try {
+    if (isPrimary) {
+      const clear = db
+        .update(contacts)
+        .set({ isPrimary: false, updatedAt: now })
+        .where(
+          and(
+            eq(contacts.orgId, tenant.orgId),
+            eq(contacts.clientId, input.clientId),
+            eq(contacts.isPrimary, true),
+          ),
+        );
+      await db.batch([clear, insert]);
+    } else {
+      await insert;
+    }
+  } catch (err) {
+    if (isPrimary && isUniqueConstraintError(err)) {
+      return { error: "primary_conflict" as const };
+    }
+    throw err;
+  }
 
   await recordActivity(db, tenant, {
     action: ContactOps.create,
@@ -210,7 +226,7 @@ export async function createContact(
     metadata: {
       clientId: input.clientId,
       name: input.name,
-      isPrimary: input.isPrimary ?? false,
+      isPrimary,
     },
   });
 
@@ -222,14 +238,17 @@ export async function createContact(
       name: input.name,
       email: input.email ?? null,
       phone: input.phone ?? null,
-      isPrimary: input.isPrimary ?? false,
+      isPrimary,
       createdAt: now,
       updatedAt: now,
     },
   };
 }
 
-/** Domain op: contacts.update */
+/**
+ * Domain op: contacts.update
+ * Primary replacement uses atomic batch + unique index (same as create).
+ */
 export async function updateContact(
   db: TavelleDb,
   tenant: TenantContext,
@@ -238,10 +257,6 @@ export async function updateContact(
 ) {
   const existing = await getContactInTenant(db, tenant, contactId);
   if (!existing) return null;
-
-  if (input.isPrimary === true) {
-    await clearPrimaryContacts(db, tenant, existing.clientId);
-  }
 
   const now = new Date();
   const next = {
@@ -253,12 +268,36 @@ export async function updateContact(
     updatedAt: now,
   };
 
-  await db
+  const write = db
     .update(contacts)
     .set(next)
     .where(
       and(eq(contacts.id, contactId), eq(contacts.orgId, tenant.orgId)),
     );
+
+  try {
+    if (next.isPrimary && !existing.isPrimary) {
+      const clearOthers = db
+        .update(contacts)
+        .set({ isPrimary: false, updatedAt: now })
+        .where(
+          and(
+            eq(contacts.orgId, tenant.orgId),
+            eq(contacts.clientId, existing.clientId),
+            eq(contacts.isPrimary, true),
+            ne(contacts.id, contactId),
+          ),
+        );
+      await db.batch([clearOthers, write]);
+    } else {
+      await write;
+    }
+  } catch (err) {
+    if (next.isPrimary && isUniqueConstraintError(err)) {
+      return { error: "primary_conflict" as const };
+    }
+    throw err;
+  }
 
   await recordActivity(db, tenant, {
     action: ContactOps.update,
@@ -272,15 +311,17 @@ export async function updateContact(
   });
 
   return {
-    id: existing.id,
-    orgId: existing.orgId,
-    clientId: existing.clientId,
-    name: next.name,
-    email: next.email,
-    phone: next.phone,
-    isPrimary: next.isPrimary,
-    createdAt: existing.createdAt,
-    updatedAt: now,
+    contact: {
+      id: existing.id,
+      orgId: existing.orgId,
+      clientId: existing.clientId,
+      name: next.name,
+      email: next.email,
+      phone: next.phone,
+      isPrimary: next.isPrimary,
+      createdAt: existing.createdAt,
+      updatedAt: now,
+    },
   };
 }
 

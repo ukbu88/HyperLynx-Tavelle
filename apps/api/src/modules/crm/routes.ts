@@ -189,7 +189,12 @@ crmRoutes.post("/contacts", async (c) => {
 
   const db = getDb(c.env);
   const result = await createContact(db, tenant, parsed.data);
-  if ("error" in result) return c.json({ error: "not_found" }, 404);
+  if ("error" in result) {
+    if (result.error === "primary_conflict") {
+      return c.json({ error: "primary_conflict" }, 409);
+    }
+    return c.json({ error: "not_found" }, 404);
+  }
   return c.json(
     { op: "contacts.create", contact: serializeContact(result.contact) },
     201,
@@ -210,9 +215,15 @@ crmRoutes.patch("/contacts/:id", async (c) => {
   }
 
   const db = getDb(c.env);
-  const contact = await updateContact(db, tenant, c.req.param("id"), parsed.data);
-  if (!contact) return c.json({ error: "not_found" }, 404);
-  return c.json({ op: "contacts.update", contact: serializeContact(contact) });
+  const result = await updateContact(db, tenant, c.req.param("id"), parsed.data);
+  if (!result) return c.json({ error: "not_found" }, 404);
+  if ("error" in result) {
+    return c.json({ error: result.error }, 409);
+  }
+  return c.json({
+    op: "contacts.update",
+    contact: serializeContact(result.contact),
+  });
 });
 
 /** Domain op: clientNotes.list */

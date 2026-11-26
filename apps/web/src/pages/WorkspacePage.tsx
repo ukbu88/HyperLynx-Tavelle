@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { Link, Navigate } from "react-router-dom";
 import type {
   ClientNote,
@@ -49,12 +55,34 @@ export function WorkspacePage() {
   const [orgSlug, setOrgSlug] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Bumps so superseded detail responses are ignored. */
+  const detailGenerationRef = useRef(0);
+  /** Synced immediately on select (not only after re-render). */
+  const selectedCustomerIdRef = useRef<string | null>(null);
+
+  const clearCustomerDetails = useCallback(() => {
+    detailGenerationRef.current += 1;
+    setContacts([]);
+    setClientNotes([]);
+  }, []);
+
+  const selectCustomerId = useCallback(
+    (customerId: string | null) => {
+      selectedCustomerIdRef.current = customerId;
+      setSelectedCustomerId(customerId);
+    },
+    [],
+  );
 
   const refreshCustomerDetail = useCallback(async (customerId: string) => {
+    const generation = ++detailGenerationRef.current;
     const [contactsRes, notesRes] = await Promise.all([
       listContacts(customerId),
       listClientNotes(customerId),
     ]);
+    // Ignore stale responses (another customer selection superseded this one).
+    if (generation !== detailGenerationRef.current) return;
+    if (selectedCustomerIdRef.current !== customerId) return;
     if (contactsRes.ok) setContacts(contactsRes.data.contacts);
     if (notesRes.ok) setClientNotes(notesRes.data.notes);
   }, []);
@@ -75,30 +103,29 @@ export function WorkspacePage() {
         if (notesRes.ok) setNotes(notesRes.data.notes);
         if (customersRes.ok) {
           setCustomers(customersRes.data.customers);
-          const wantId = preferCustomerId ?? selectedCustomerId;
+          const wantId = preferCustomerId ?? selectedCustomerIdRef.current;
           const stillSelected = wantId
             ? customersRes.data.customers.find((c) => c.id === wantId)
             : undefined;
           if (stillSelected) {
-            setSelectedCustomerId(stillSelected.id);
+            selectCustomerId(stillSelected.id);
             setEditName(stillSelected.name);
             await refreshCustomerDetail(stillSelected.id);
           } else {
-            setSelectedCustomerId(null);
-            setContacts([]);
-            setClientNotes([]);
+            selectCustomerId(null);
+            clearCustomerDetails();
             setEditName("");
           }
         }
       } else {
         setNotes([]);
         setCustomers([]);
-        setSelectedCustomerId(null);
-        setContacts([]);
-        setClientNotes([]);
+        selectCustomerId(null);
+        clearCustomerDetails();
+        setEditName("");
       }
     },
-    [refreshCustomerDetail, selectedCustomerId],
+    [clearCustomerDetails, refreshCustomerDetail, selectCustomerId],
   );
 
   useEffect(() => {
@@ -128,7 +155,9 @@ export function WorkspacePage() {
       return;
     }
     setStatus(`Active org → ${orgId}`);
-    setSelectedCustomerId(null);
+    selectCustomerId(null);
+    clearCustomerDetails();
+    setEditName("");
     await refresh();
   }
 
@@ -172,9 +201,11 @@ export function WorkspacePage() {
   }
 
   async function onSelectCustomer(customer: Customer) {
-    setSelectedCustomerId(customer.id);
+    selectCustomerId(customer.id);
     setEditName(customer.name);
     setError(null);
+    // Clear previous customer's panel immediately so stale rows never linger.
+    clearCustomerDetails();
     await refreshCustomerDetail(customer.id);
   }
 
