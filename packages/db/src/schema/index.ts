@@ -17,3 +17,9 @@ export {
   STAFF_ROLES,
   type StaffRole,
 } from "./orgs.js";
+export {
+  clients,
+  contacts,
+  clientNotes,
+  activityEvents,
+} from "./crm.js";

@@ -1,22 +1,47 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate } from "react-router-dom";
-import type { MeResponse, WorkspaceNote } from "@tavelle/contracts";
+import type {
+  ClientNote,
+  Contact,
+  Customer,
+  MeResponse,
+  WorkspaceNote,
+} from "@tavelle/contracts";
 import { AppHeader } from "../shell/AppHeader";
 import { authClient } from "../lib/auth-client";
 import {
+  createClientNote,
+  createContact,
+  createCustomer,
   createNote,
   createOrg,
   fetchMe,
   inviteStaff,
+  listClientNotes,
+  listContacts,
+  listCustomers,
   listNotes,
   seedDemoOrgs,
   switchOrg,
+  updateCustomer,
 } from "../lib/api";
 
 export function WorkspacePage() {
   const { data: session, isPending } = authClient.useSession();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [notes, setNotes] = useState<WorkspaceNote[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+    null,
+  );
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [clientNotes, setClientNotes] = useState<ClientNote[]>([]);
+  const [customerName, setCustomerName] = useState("");
+  const [editName, setEditName] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPrimary, setContactPrimary] = useState(false);
+  const [clientNoteBody, setClientNoteBody] = useState("");
   const [noteBody, setNoteBody] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
@@ -25,20 +50,56 @@ export function WorkspacePage() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    const meRes = await fetchMe();
-    if (!meRes.ok) {
-      setError(meRes.error);
-      return;
-    }
-    setMe(meRes.data);
-    if (meRes.data.activeOrgId) {
-      const notesRes = await listNotes();
-      if (notesRes.ok) setNotes(notesRes.data.notes);
-    } else {
-      setNotes([]);
-    }
+  const refreshCustomerDetail = useCallback(async (customerId: string) => {
+    const [contactsRes, notesRes] = await Promise.all([
+      listContacts(customerId),
+      listClientNotes(customerId),
+    ]);
+    if (contactsRes.ok) setContacts(contactsRes.data.contacts);
+    if (notesRes.ok) setClientNotes(notesRes.data.notes);
   }, []);
+
+  const refresh = useCallback(
+    async (preferCustomerId?: string | null) => {
+      const meRes = await fetchMe();
+      if (!meRes.ok) {
+        setError(meRes.error);
+        return;
+      }
+      setMe(meRes.data);
+      if (meRes.data.activeOrgId) {
+        const [notesRes, customersRes] = await Promise.all([
+          listNotes(),
+          listCustomers(),
+        ]);
+        if (notesRes.ok) setNotes(notesRes.data.notes);
+        if (customersRes.ok) {
+          setCustomers(customersRes.data.customers);
+          const wantId = preferCustomerId ?? selectedCustomerId;
+          const stillSelected = wantId
+            ? customersRes.data.customers.find((c) => c.id === wantId)
+            : undefined;
+          if (stillSelected) {
+            setSelectedCustomerId(stillSelected.id);
+            setEditName(stillSelected.name);
+            await refreshCustomerDetail(stillSelected.id);
+          } else {
+            setSelectedCustomerId(null);
+            setContacts([]);
+            setClientNotes([]);
+            setEditName("");
+          }
+        }
+      } else {
+        setNotes([]);
+        setCustomers([]);
+        setSelectedCustomerId(null);
+        setContacts([]);
+        setClientNotes([]);
+      }
+    },
+    [refreshCustomerDetail, selectedCustomerId],
+  );
 
   useEffect(() => {
     if (session?.user) void refresh();
@@ -67,6 +128,7 @@ export function WorkspacePage() {
       return;
     }
     setStatus(`Active org → ${orgId}`);
+    setSelectedCustomerId(null);
     await refresh();
   }
 
@@ -94,6 +156,77 @@ export function WorkspacePage() {
     }
     setNoteBody("");
     await refresh();
+  }
+
+  async function onCreateCustomer(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const res = await createCustomer({ name: customerName });
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setCustomerName("");
+    setStatus(`customers.create → ${res.data.customer.name}`);
+    await refresh(res.data.customer.id);
+  }
+
+  async function onSelectCustomer(customer: Customer) {
+    setSelectedCustomerId(customer.id);
+    setEditName(customer.name);
+    setError(null);
+    await refreshCustomerDetail(customer.id);
+  }
+
+  async function onUpdateCustomer(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedCustomerId) return;
+    setError(null);
+    const res = await updateCustomer(selectedCustomerId, { name: editName });
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setStatus(`customers.update → ${res.data.customer.name}`);
+    await refresh();
+  }
+
+  async function onCreateContact(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedCustomerId) return;
+    setError(null);
+    const res = await createContact({
+      clientId: selectedCustomerId,
+      name: contactName,
+      email: contactEmail || null,
+      isPrimary: contactPrimary,
+    });
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setContactName("");
+    setContactEmail("");
+    setContactPrimary(false);
+    setStatus(`contacts.create → ${res.data.contact.name}`);
+    await refreshCustomerDetail(selectedCustomerId);
+  }
+
+  async function onCreateClientNote(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedCustomerId) return;
+    setError(null);
+    const res = await createClientNote({
+      clientId: selectedCustomerId,
+      body: clientNoteBody,
+    });
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setClientNoteBody("");
+    setStatus(`clientNotes.create`);
+    await refreshCustomerDetail(selectedCustomerId);
   }
 
   async function onProvision(e: FormEvent) {
@@ -125,16 +258,18 @@ export function WorkspacePage() {
     await refresh();
   }
 
+  const selected = customers.find((c) => c.id === selectedCustomerId) ?? null;
+
   return (
     <>
       <AppHeader email={session.user.email} />
       <main className="shell">
         <header className="shell__intro">
           <p className="shell__eyebrow">Workspace</p>
-          <h1 className="shell__title">Identity &amp; tenancy</h1>
+          <h1 className="shell__title">Customers</h1>
           <p className="shell__tagline">
-            Active org is server-verified from your membership cookie — forged
-            org IDs are rejected.
+            Domain ops (<code>customers.*</code> / <code>contacts.*</code>) run
+            through TenantContext — not UI-only logic.
           </p>
         </header>
 
@@ -180,8 +315,155 @@ export function WorkspacePage() {
         {me?.activeOrgId && (
           <>
             <section className="workspace-section">
+              <h2>Customers</h2>
+              <p className="auth-message">
+                Explicit ops: customers.create / list / get / update.
+              </p>
+              <form
+                className="auth-form auth-form--inline"
+                onSubmit={(e) => void onCreateCustomer(e)}
+              >
+                <label className="auth-field">
+                  <span>Name</span>
+                  <input
+                    type="text"
+                    required
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                  />
+                </label>
+                <button type="submit" className="auth-btn auth-btn--primary">
+                  Create customer
+                </button>
+              </form>
+              <ul className="note-list">
+                {customers.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      className={
+                        selectedCustomerId === c.id
+                          ? "org-chip org-chip--active"
+                          : "org-chip"
+                      }
+                      onClick={() => void onSelectCustomer(c)}
+                    >
+                      <span className="org-chip__name">{c.name}</span>
+                      <span className="org-chip__meta">{c.status}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            {selected && (
+              <section className="workspace-section">
+                <h2>Customer detail</h2>
+                <form
+                  className="auth-form auth-form--inline"
+                  onSubmit={(e) => void onUpdateCustomer(e)}
+                >
+                  <label className="auth-field">
+                    <span>Name</span>
+                    <input
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                    />
+                  </label>
+                  <button type="submit" className="auth-btn auth-btn--primary">
+                    Update
+                  </button>
+                </form>
+
+                <h3 className="workspace-subhead">Contacts</h3>
+                <form
+                  className="auth-form"
+                  onSubmit={(e) => void onCreateContact(e)}
+                >
+                  <label className="auth-field">
+                    <span>Name</span>
+                    <input
+                      type="text"
+                      required
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                    />
+                  </label>
+                  <label className="auth-field">
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                    />
+                  </label>
+                  <label className="auth-check">
+                    <input
+                      type="checkbox"
+                      checked={contactPrimary}
+                      onChange={(e) => setContactPrimary(e.target.checked)}
+                    />
+                    <span>Primary contact</span>
+                  </label>
+                  <button type="submit" className="auth-btn auth-btn--primary">
+                    Add contact
+                  </button>
+                </form>
+                <ul className="note-list">
+                  {contacts.map((ct) => (
+                    <li key={ct.id}>
+                      <span>
+                        {ct.name}
+                        {ct.email ? ` · ${ct.email}` : ""}
+                      </span>
+                      <span className="org-chip__meta">
+                        {ct.isPrimary ? "primary" : "contact"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                <h3 className="workspace-subhead">Client notes</h3>
+                <form
+                  className="auth-form auth-form--inline"
+                  onSubmit={(e) => void onCreateClientNote(e)}
+                >
+                  <label className="auth-field">
+                    <span>Note</span>
+                    <input
+                      type="text"
+                      required
+                      value={clientNoteBody}
+                      onChange={(e) => setClientNoteBody(e.target.value)}
+                    />
+                  </label>
+                  <button type="submit" className="auth-btn auth-btn--primary">
+                    Add note
+                  </button>
+                </form>
+                <ul className="note-list">
+                  {clientNotes.map((n) => (
+                    <li key={n.id}>
+                      <span>{n.body}</span>
+                      <time dateTime={n.createdAt}>
+                        {new Date(n.createdAt).toLocaleString("en-AU", {
+                          timeZone: "Australia/Brisbane",
+                        })}
+                      </time>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <section className="workspace-section">
               <h2>Invite staff</h2>
-              <form className="auth-form auth-form--inline" onSubmit={(e) => void onInvite(e)}>
+              <form
+                className="auth-form auth-form--inline"
+                onSubmit={(e) => void onInvite(e)}
+              >
                 <label className="auth-field">
                   <span>Email</span>
                   <input
@@ -206,7 +488,7 @@ export function WorkspacePage() {
             <section className="workspace-section">
               <h2>Workspace notes</h2>
               <p className="auth-message">
-                Org-scoped CRUD proving TenantContext isolation.
+                Org-scoped tenancy proof (not CRM client notes).
               </p>
               <form
                 className="auth-form auth-form--inline"

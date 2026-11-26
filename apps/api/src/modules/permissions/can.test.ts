@@ -13,4 +13,10 @@ describe("permissions.can", () => {
   it("blocks viewer from writing notes", () => {
     expect(can("viewer", "note:write")).toBe(false);
   });
+
+  it("allows member client write; blocks viewer", () => {
+    expect(can("member", "client:write")).toBe(true);
+    expect(can("viewer", "client:write")).toBe(false);
+    expect(can("viewer", "client:read")).toBe(true);
+  });
 });
