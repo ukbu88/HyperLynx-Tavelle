@@ -25,6 +25,12 @@ If Better Auth breaks on Workers/D1 in a way we cannot fix quickly:
 
 No product architecture rewrite required — that was the ADR-001 containment goal.
 
+## Platform admin gate
+
+`PLATFORM_ADMIN_EMAILS` alone is not enough: `isPlatformAdmin` also requires
+`emailVerified === true` (mailbox ownership). Password signup does not verify
+email; use magic link (or another verified path) before org provision / seed.
+
 ## Secrets (never paste into chat)
 
 ```bash

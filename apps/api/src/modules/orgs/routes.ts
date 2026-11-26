@@ -30,7 +30,7 @@ orgRoutes.get("/me", async (c) => {
     user: { id: user.id, email: user.email, name: user.name },
     memberships,
     activeOrgId: tenant?.orgId ?? null,
-    isPlatformAdmin: isPlatformAdmin(c.env, user.email),
+    isPlatformAdmin: isPlatformAdmin(c.env, user.email, user.emailVerified),
   });
 
   return c.json(body);
@@ -40,12 +40,13 @@ orgRoutes.post("/orgs", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
 
-  if (!isPlatformAdmin(c.env, user.email)) {
+  if (!isPlatformAdmin(c.env, user.email, user.emailVerified)) {
     return c.json(
       {
         error: "forbidden",
-        message:
-          "Organisation creation is invite-only. Platform admins provision orgs.",
+        message: user.emailVerified
+          ? "Organisation creation is invite-only. Platform admins provision orgs."
+          : "Verify your email (e.g. magic link) before using platform-admin actions.",
       },
       403,
     );

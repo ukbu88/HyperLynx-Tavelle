@@ -1,10 +1,16 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useMemo, useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AppHeader } from "../shell/AppHeader";
 import { authClient } from "../lib/auth-client";
+import { sanitizeNextPath, withNextParam } from "../lib/auth-redirect";
 
 export function SignUpPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const nextPath = useMemo(
+    () => sanitizeNextPath(params.get("next")) ?? "/app",
+    [params],
+  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +31,7 @@ export function SignUpPage() {
         setError(err.message ?? "Could not create account");
         return;
       }
-      navigate("/app");
+      navigate(nextPath);
     } finally {
       setPending(false);
     }
@@ -89,7 +95,10 @@ export function SignUpPage() {
         </form>
 
         <p className="auth-footer">
-          Already have an account? <Link to="/sign-in">Sign in</Link>
+          Already have an account?{" "}
+          <Link to={withNextParam("/sign-in", nextPath === "/app" ? null : nextPath)}>
+            Sign in
+          </Link>
         </p>
       </main>
     </>

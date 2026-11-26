@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AppHeader } from "../shell/AppHeader";
 import { authClient } from "../lib/auth-client";
 import { acceptInvite } from "../lib/api";
+import { acceptInvitePath, withNextParam } from "../lib/auth-redirect";
 
 export function AcceptInvitePage() {
   const [params] = useSearchParams();
@@ -12,6 +13,10 @@ export function AcceptInvitePage() {
   const [pending, setPending] = useState(false);
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
+
+  const inviteReturn = acceptInvitePath(token || tokenFromUrl);
+  const signInHref = withNextParam("/sign-in", inviteReturn);
+  const signUpHref = withNextParam("/sign-up", inviteReturn);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -48,8 +53,9 @@ export function AcceptInvitePage() {
 
         {!session?.user && (
           <p className="auth-message">
-            <Link to={`/sign-in`}>Sign in</Link> or{" "}
-            <Link to="/sign-up">create an account</Link> with the invited email.
+            <Link to={signInHref}>Sign in</Link> or{" "}
+            <Link to={signUpHref}>create an account</Link> with the invited
+            email — you will return here with the invite token preserved.
           </p>
         )}
 

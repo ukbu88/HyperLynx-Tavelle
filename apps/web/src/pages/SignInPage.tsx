@@ -1,12 +1,18 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useMemo, useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AppHeader } from "../shell/AppHeader";
 import { authClient } from "../lib/auth-client";
+import { sanitizeNextPath, withNextParam } from "../lib/auth-redirect";
 
 type Mode = "password" | "magic";
 
 export function SignInPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const nextPath = useMemo(
+    () => sanitizeNextPath(params.get("next")) ?? "/app",
+    [params],
+  );
   const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,13 +35,13 @@ export function SignInPage() {
           setError(err.message ?? "Sign in failed");
           return;
         }
-        navigate("/app");
+        navigate(nextPath);
         return;
       }
 
       const { error: err } = await authClient.signIn.magicLink({
         email,
-        callbackURL: "/app",
+        callbackURL: nextPath,
       });
       if (err) {
         setError(err.message ?? "Could not send magic link");
@@ -128,7 +134,10 @@ export function SignInPage() {
         </form>
 
         <p className="auth-footer">
-          No account yet? <Link to="/sign-up">Create one</Link>
+          No account yet?{" "}
+          <Link to={withNextParam("/sign-up", nextPath === "/app" ? null : nextPath)}>
+            Create one
+          </Link>
         </p>
       </main>
     </>

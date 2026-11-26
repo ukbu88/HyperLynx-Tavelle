@@ -20,8 +20,16 @@ seedRoutes.post("/seed/demo-orgs", async (c) => {
 
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  if (!isPlatformAdmin(c.env, user.email)) {
-    return c.json({ error: "forbidden" }, 403);
+  if (!isPlatformAdmin(c.env, user.email, user.emailVerified)) {
+    return c.json(
+      {
+        error: "forbidden",
+        message: user.emailVerified
+          ? "Platform admin required"
+          : "Verify your email before using platform-admin actions.",
+      },
+      403,
+    );
   }
 
   const db = getDb(c.env);

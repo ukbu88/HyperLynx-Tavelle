@@ -15,6 +15,7 @@ export const sessionMiddleware = createMiddleware<{
         id: session.user.id,
         email: session.user.email,
         name: session.user.name,
+        emailVerified: Boolean(session.user.emailVerified),
       });
     } else {
       c.set("sessionUser", null);

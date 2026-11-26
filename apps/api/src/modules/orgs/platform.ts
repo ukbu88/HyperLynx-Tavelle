@@ -10,6 +10,15 @@ export function parsePlatformAdminEmails(env: Env): Set<string> {
   );
 }
 
-export function isPlatformAdmin(env: Env, email: string): boolean {
+/**
+ * Platform-admin privilege requires both allowlist match AND verified email
+ * ownership — prevents registering an allowlisted address without mailbox proof.
+ */
+export function isPlatformAdmin(
+  env: Env,
+  email: string,
+  emailVerified: boolean,
+): boolean {
+  if (!emailVerified) return false;
   return parsePlatformAdminEmails(env).has(email.trim().toLowerCase());
 }
