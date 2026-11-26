@@ -37,10 +37,39 @@ export function fetchMe() {
 }
 
 export function switchOrg(orgId: string) {
-  return api<{ activeOrgId: string; role: string }>("/api/orgs/switch", {
+  return api<{ activeOrgId: string; activeBusinessId: string | null; role: string }>(
+    "/api/orgs/switch",
+    {
+      method: "POST",
+      body: JSON.stringify({ orgId }),
+    },
+  );
+}
+
+export function switchBusiness(businessId: string) {
+  return api<{
+    op: string;
+    activeBusinessId: string;
+    business: { id: string; name: string; slug: string };
+  }>("/api/businesses/switch", {
     method: "POST",
-    body: JSON.stringify({ orgId }),
+    body: JSON.stringify({ businessId }),
   });
+}
+
+export function listBusinesses() {
+  return api<{
+    op: string;
+    businesses: Array<{
+      id: string;
+      orgId: string;
+      name: string;
+      slug: string;
+      status: string;
+      createdAt: string;
+    }>;
+    activeBusinessId: string | null;
+  }>("/api/businesses");
 }
 
 export function createOrg(input: {
@@ -78,7 +107,26 @@ export function acceptInvite(token: string) {
 }
 
 export function seedDemoOrgs() {
-  return api<{ orgIds: string[]; count: number }>("/api/seed/demo-orgs", {
+  return api<{
+    orgIds: string[];
+    count: number;
+    hyperlynx?: {
+      orgId: string;
+      businesses: Array<{ id: string; name: string; slug: string }>;
+    };
+  }>("/api/seed/demo-orgs", {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+export function seedHyperlynx() {
+  return api<{
+    orgId: string;
+    businesses: Array<{ id: string; name: string; slug: string }>;
+    activeBusinessId: string | null;
+    message: string;
+  }>("/api/seed/hyperlynx", {
     method: "POST",
     body: "{}",
   });

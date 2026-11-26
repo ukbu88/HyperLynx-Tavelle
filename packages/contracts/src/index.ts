@@ -53,3 +53,15 @@ export {
   type ClientNotesCreateInput,
   type ActivityEvent,
 } from "./crm.js";
+
+export {
+  BusinessOps,
+  BusinessSchema,
+  SwitchBusinessSchema,
+  BusinessModuleConfigSchema,
+  CORE_MODULE_KEYS,
+  type Business,
+  type SwitchBusinessInput,
+  type BusinessModuleConfig,
+  type CoreModuleKey,
+} from "./businesses.js";

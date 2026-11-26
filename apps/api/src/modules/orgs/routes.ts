@@ -7,7 +7,11 @@ import {
 } from "@tavelle/contracts";
 import type { AppVariables, Env } from "../../env.js";
 import { requireSessionUser } from "../../middleware/session.js";
-import { ACTIVE_ORG_COOKIE } from "../../middleware/tenant.js";
+import {
+  ACTIVE_BUSINESS_COOKIE,
+  ACTIVE_ORG_COOKIE,
+} from "../../middleware/tenant.js";
+import { listBusinessesForOrg } from "../businesses/service.js";
 import { isPlatformAdmin } from "./platform.js";
 import {
   getDb,
@@ -18,6 +22,16 @@ import {
 
 export const orgRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
+function cookieOpts(env: Env) {
+  return {
+    httpOnly: true,
+    sameSite: "Lax" as const,
+    path: "/",
+    secure: (env.ENVIRONMENT ?? "") !== "development",
+    maxAge: 60 * 60 * 24 * 30,
+  };
+}
+
 orgRoutes.get("/me", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
@@ -26,10 +40,22 @@ orgRoutes.get("/me", async (c) => {
   const memberships = await listMembershipsForUser(db, user.id);
   const tenant = c.get("tenant");
 
+  const orgBusinesses = tenant
+    ? await listBusinessesForOrg(db, tenant.orgId)
+    : [];
+
   const body = MeResponseSchema.parse({
     user: { id: user.id, email: user.email, name: user.name },
     memberships,
     activeOrgId: tenant?.orgId ?? null,
+    activeBusinessId: tenant?.businessId ?? null,
+    businesses: orgBusinesses.map((b) => ({
+      id: b.id,
+      orgId: b.orgId,
+      name: b.name,
+      slug: b.slug,
+      status: b.status,
+    })),
     isPlatformAdmin: isPlatformAdmin(c.env, user.email, user.emailVerified),
   });
 
@@ -59,15 +85,20 @@ orgRoutes.post("/orgs", async (c) => {
 
   const db = getDb(c.env);
   try {
-    const { orgId } = await provisionOrganisation(db, parsed.data, user.id);
-    setCookie(c, ACTIVE_ORG_COOKIE, orgId, {
-      httpOnly: true,
-      sameSite: "Lax",
-      path: "/",
-      secure: (c.env.ENVIRONMENT ?? "") !== "development",
-      maxAge: 60 * 60 * 24 * 30,
-    });
-    return c.json({ orgId }, 201);
+    const { orgId, businessId, businesses } = await provisionOrganisation(
+      db,
+      parsed.data,
+      user.id,
+    );
+    const opts = cookieOpts(c.env);
+    setCookie(c, ACTIVE_ORG_COOKIE, orgId, opts);
+    // Default business is created with the org — activate it for CRM.
+    if (businessId) {
+      setCookie(c, ACTIVE_BUSINESS_COOKIE, businessId, opts);
+    } else {
+      setCookie(c, ACTIVE_BUSINESS_COOKIE, "", { ...opts, maxAge: 0 });
+    }
+    return c.json({ orgId, businessId, businesses }, 201);
   } catch (err) {
     console.error("org_provision_failed", c.get("requestId"), err);
     return c.json({ error: "provision_failed" }, 500);
@@ -90,13 +121,21 @@ orgRoutes.post("/orgs/switch", async (c) => {
     return c.json({ error: "forbidden", message: "Not a member of that org" }, 403);
   }
 
-  setCookie(c, ACTIVE_ORG_COOKIE, parsed.data.orgId, {
-    httpOnly: true,
-    sameSite: "Lax",
-    path: "/",
-    secure: (c.env.ENVIRONMENT ?? "") !== "development",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  const opts = cookieOpts(c.env);
+  setCookie(c, ACTIVE_ORG_COOKIE, parsed.data.orgId, opts);
 
-  return c.json({ activeOrgId: parsed.data.orgId, role: membership.role });
+  // Reset business to first in the new org (middleware will align on next request).
+  const orgBusinesses = await listBusinessesForOrg(db, parsed.data.orgId);
+  const first = orgBusinesses[0];
+  if (first) {
+    setCookie(c, ACTIVE_BUSINESS_COOKIE, first.id, opts);
+  } else {
+    setCookie(c, ACTIVE_BUSINESS_COOKIE, "", { ...opts, maxAge: 0 });
+  }
+
+  return c.json({
+    activeOrgId: parsed.data.orgId,
+    activeBusinessId: first?.id ?? null,
+    role: membership.role,
+  });
 });

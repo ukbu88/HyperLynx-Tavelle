@@ -28,6 +28,8 @@ import {
   listCustomers,
   listNotes,
   seedDemoOrgs,
+  seedHyperlynx,
+  switchBusiness,
   switchOrg,
   updateCustomer,
 } from "../lib/api";
@@ -95,12 +97,18 @@ export function WorkspacePage() {
         return;
       }
       setMe(meRes.data);
+
+      // Workspace notes are org-scoped — load whenever an org is active.
       if (meRes.data.activeOrgId) {
-        const [notesRes, customersRes] = await Promise.all([
-          listNotes(),
-          listCustomers(),
-        ]);
+        const notesRes = await listNotes();
         if (notesRes.ok) setNotes(notesRes.data.notes);
+      } else {
+        setNotes([]);
+      }
+
+      // CRM customers require an active business workspace.
+      if (meRes.data.activeOrgId && meRes.data.activeBusinessId) {
+        const customersRes = await listCustomers();
         if (customersRes.ok) {
           setCustomers(customersRes.data.customers);
           const wantId = preferCustomerId ?? selectedCustomerIdRef.current;
@@ -116,9 +124,12 @@ export function WorkspacePage() {
             clearCustomerDetails();
             setEditName("");
           }
+        } else if (customersRes.status === 400) {
+          setCustomers([]);
+          selectCustomerId(null);
+          clearCustomerDetails();
         }
       } else {
-        setNotes([]);
         setCustomers([]);
         selectCustomerId(null);
         clearCustomerDetails();
@@ -147,7 +158,7 @@ export function WorkspacePage() {
     return <Navigate to="/sign-in" replace />;
   }
 
-  async function onSwitch(orgId: string) {
+  async function onSwitchOrg(orgId: string) {
     setError(null);
     const res = await switchOrg(orgId);
     if (!res.ok) {
@@ -158,6 +169,21 @@ export function WorkspacePage() {
     selectCustomerId(null);
     clearCustomerDetails();
     setEditName("");
+    await refresh();
+  }
+
+  async function onSwitchBusiness(businessId: string) {
+    setError(null);
+    const res = await switchBusiness(businessId);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setStatus(`Active business → ${res.data.business.name}`);
+    selectCustomerId(null);
+    clearCustomerDetails();
+    setEditName("");
+    setCustomers([]);
     await refresh();
   }
 
@@ -285,11 +311,27 @@ export function WorkspacePage() {
       setError(res.error);
       return;
     }
-    setStatus(`Seeded ${res.data.count} demo orgs`);
+    const bizNames =
+      res.data.hyperlynx?.businesses.map((b) => b.name).join(" + ") ??
+      "businesses";
+    setStatus(`Seeded HyperLynx (${bizNames}) + demo tenant`);
+    await refresh();
+  }
+
+  async function onSeedHyperlynx() {
+    setError(null);
+    const res = await seedHyperlynx();
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setStatus(res.data.message);
     await refresh();
   }
 
   const selected = customers.find((c) => c.id === selectedCustomerId) ?? null;
+  const activeBusiness =
+    me?.businesses.find((b) => b.id === me.activeBusinessId) ?? null;
 
   return (
     <>
@@ -300,7 +342,7 @@ export function WorkspacePage() {
           <h1 className="shell__title">Customers</h1>
           <p className="shell__tagline">
             Domain ops (<code>customers.*</code> / <code>contacts.*</code>) run
-            through TenantContext — not UI-only logic.
+            through TenantContext — org + active business, not UI-only logic.
           </p>
         </header>
 
@@ -313,7 +355,9 @@ export function WorkspacePage() {
             <p className="auth-message">
               No memberships yet. Accept an{" "}
               <Link to="/accept-invite">invite</Link>
-              {me.isPlatformAdmin ? " or provision / seed orgs below." : "."}
+              {me.isPlatformAdmin
+                ? " or seed HyperLynx below."
+                : "."}
             </p>
           )}
           {me && me.memberships.length > 0 && (
@@ -327,7 +371,7 @@ export function WorkspacePage() {
                         ? "org-chip org-chip--active"
                         : "org-chip"
                     }
-                    onClick={() => void onSwitch(m.orgId)}
+                    onClick={() => void onSwitchOrg(m.orgId)}
                   >
                     <span className="org-chip__name">
                       {m.displayName ?? m.orgName}
@@ -344,11 +388,52 @@ export function WorkspacePage() {
         </section>
 
         {me?.activeOrgId && (
+          <section className="workspace-section">
+            <h2>Business workspace</h2>
+            <p className="auth-message">
+              Switch with <code>businesses.setActive</code> — lists never mix
+              across Dispatch Sites and NexRail.
+            </p>
+            {me.businesses.length === 0 ? (
+              <p className="auth-message">
+                No businesses in this org yet.
+                {me.isPlatformAdmin
+                  ? " Seed HyperLynx to create Dispatch Sites + NexRail."
+                  : ""}
+              </p>
+            ) : (
+              <div className="business-switcher" role="group" aria-label="Business workspace">
+                {me.businesses.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    className={
+                      me.activeBusinessId === b.id
+                        ? "business-chip business-chip--active"
+                        : "business-chip"
+                    }
+                    onClick={() => void onSwitchBusiness(b.id)}
+                    aria-pressed={me.activeBusinessId === b.id}
+                  >
+                    <span className="business-chip__name">{b.name}</span>
+                    <span className="business-chip__meta">{b.slug}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {me?.activeOrgId && me.activeBusinessId && (
           <>
             <section className="workspace-section">
-              <h2>Customers</h2>
+              <h2>
+                Customers
+                {activeBusiness ? ` · ${activeBusiness.name}` : ""}
+              </h2>
               <p className="auth-message">
-                Explicit ops: customers.create / list / get / update.
+                Explicit ops: customers.create / list / get / update — scoped to
+                the active business.
               </p>
               <form
                 className="auth-form auth-form--inline"
@@ -367,24 +452,31 @@ export function WorkspacePage() {
                   Create customer
                 </button>
               </form>
-              <ul className="note-list">
-                {customers.map((c) => (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      className={
-                        selectedCustomerId === c.id
-                          ? "org-chip org-chip--active"
-                          : "org-chip"
-                      }
-                      onClick={() => void onSelectCustomer(c)}
-                    >
-                      <span className="org-chip__name">{c.name}</span>
-                      <span className="org-chip__meta">{c.status}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {customers.length === 0 ? (
+                <p className="empty-state">
+                  No customers in {activeBusiness?.name ?? "this business"} yet.
+                  Create one to start the relationship record.
+                </p>
+              ) : (
+                <ul className="note-list">
+                  {customers.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        className={
+                          selectedCustomerId === c.id
+                            ? "org-chip org-chip--active"
+                            : "org-chip"
+                        }
+                        onClick={() => void onSelectCustomer(c)}
+                      >
+                        <span className="org-chip__name">{c.name}</span>
+                        <span className="org-chip__meta">{c.status}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             {selected && (
@@ -488,7 +580,11 @@ export function WorkspacePage() {
                 </ul>
               </section>
             )}
+          </>
+        )}
 
+        {me?.activeOrgId && (
+          <>
             <section className="workspace-section">
               <h2>Invite staff</h2>
               <form
@@ -558,8 +654,25 @@ export function WorkspacePage() {
           <section className="workspace-section">
             <h2>Platform admin</h2>
             <p className="auth-message">
-              Invite-only org provisioning — not public self-serve signup.
+              Invite-only org provisioning — seed HyperLynx for Dispatch Sites +
+              NexRail workspaces.
             </p>
+            <div className="auth-cta">
+              <button
+                type="button"
+                className="auth-btn auth-btn--primary"
+                onClick={() => void onSeedHyperlynx()}
+              >
+                Seed HyperLynx businesses
+              </button>
+              <button
+                type="button"
+                className="auth-btn auth-btn--ghost"
+                onClick={() => void onSeed()}
+              >
+                Seed HyperLynx + demo tenant
+              </button>
+            </div>
             <form className="auth-form" onSubmit={(e) => void onProvision(e)}>
               <label className="auth-field">
                 <span>Name</span>
@@ -582,13 +695,6 @@ export function WorkspacePage() {
                 Provision organisation
               </button>
             </form>
-            <button
-              type="button"
-              className="auth-btn auth-btn--ghost"
-              onClick={() => void onSeed()}
-            >
-              Seed two demo orgs
-            </button>
           </section>
         )}
       </main>

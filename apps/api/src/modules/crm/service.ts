@@ -14,7 +14,7 @@ import type {
 } from "@tavelle/contracts";
 import { CustomerOps, ContactOps, ClientNoteOps } from "@tavelle/contracts";
 import { newId } from "../../lib/ids.js";
-import type { TenantContext } from "../../env.js";
+import type { BusinessTenantContext } from "../../env.js";
 import { recordActivity } from "../activity/service.js";
 
 function notDeleted() {
@@ -29,18 +29,28 @@ function isUniqueConstraintError(err: unknown): boolean {
   );
 }
 
-export async function listCustomers(db: TavelleDb, tenant: TenantContext) {
+function businessScope(tenant: BusinessTenantContext) {
+  return and(
+    eq(clients.orgId, tenant.orgId),
+    eq(clients.businessId, tenant.businessId),
+  );
+}
+
+export async function listCustomers(
+  db: TavelleDb,
+  tenant: BusinessTenantContext,
+) {
   return db
     .select()
     .from(clients)
-    .where(and(eq(clients.orgId, tenant.orgId), notDeleted()))
+    .where(and(businessScope(tenant), notDeleted()))
     .orderBy(desc(clients.createdAt))
     .all();
 }
 
 export async function getCustomerInTenant(
   db: TavelleDb,
-  tenant: TenantContext,
+  tenant: BusinessTenantContext,
   customerId: string,
 ) {
   return db
@@ -50,16 +60,17 @@ export async function getCustomerInTenant(
       and(
         eq(clients.id, customerId),
         eq(clients.orgId, tenant.orgId),
+        eq(clients.businessId, tenant.businessId),
         notDeleted(),
       ),
     )
     .get();
 }
 
-/** Domain op: customers.create — orgId always from TenantContext. */
+/** Domain op: customers.create — orgId + businessId always from TenantContext. */
 export async function createCustomer(
   db: TavelleDb,
-  tenant: TenantContext,
+  tenant: BusinessTenantContext,
   input: CustomersCreateInput,
 ) {
   const id = newId();
@@ -67,6 +78,7 @@ export async function createCustomer(
   await db.insert(clients).values({
     id,
     orgId: tenant.orgId,
+    businessId: tenant.businessId,
     name: input.name,
     status: input.status,
     createdAt: now,
@@ -83,6 +95,7 @@ export async function createCustomer(
   return {
     id,
     orgId: tenant.orgId,
+    businessId: tenant.businessId,
     name: input.name,
     status: input.status,
     createdAt: now,
@@ -93,7 +106,7 @@ export async function createCustomer(
 /** Domain op: customers.update */
 export async function updateCustomer(
   db: TavelleDb,
-  tenant: TenantContext,
+  tenant: BusinessTenantContext,
   customerId: string,
   input: CustomersUpdateInput,
 ) {
@@ -111,7 +124,11 @@ export async function updateCustomer(
     .update(clients)
     .set(next)
     .where(
-      and(eq(clients.id, customerId), eq(clients.orgId, tenant.orgId)),
+      and(
+        eq(clients.id, customerId),
+        eq(clients.orgId, tenant.orgId),
+        eq(clients.businessId, tenant.businessId),
+      ),
     );
 
   await recordActivity(db, tenant, {
@@ -127,6 +144,7 @@ export async function updateCustomer(
   return {
     id: existing.id,
     orgId: existing.orgId,
+    businessId: existing.businessId,
     name: next.name,
     status: next.status,
     createdAt: existing.createdAt,
@@ -136,7 +154,7 @@ export async function updateCustomer(
 
 export async function listContactsForCustomer(
   db: TavelleDb,
-  tenant: TenantContext,
+  tenant: BusinessTenantContext,
   clientId: string,
 ) {
   const customer = await getCustomerInTenant(db, tenant, clientId);
@@ -146,7 +164,11 @@ export async function listContactsForCustomer(
     .select()
     .from(contacts)
     .where(
-      and(eq(contacts.orgId, tenant.orgId), eq(contacts.clientId, clientId)),
+      and(
+        eq(contacts.orgId, tenant.orgId),
+        eq(contacts.businessId, tenant.businessId),
+        eq(contacts.clientId, clientId),
+      ),
     )
     .orderBy(desc(contacts.isPrimary), desc(contacts.createdAt))
     .all();
@@ -155,14 +177,18 @@ export async function listContactsForCustomer(
 
 export async function getContactInTenant(
   db: TavelleDb,
-  tenant: TenantContext,
+  tenant: BusinessTenantContext,
   contactId: string,
 ) {
   return db
     .select()
     .from(contacts)
     .where(
-      and(eq(contacts.id, contactId), eq(contacts.orgId, tenant.orgId)),
+      and(
+        eq(contacts.id, contactId),
+        eq(contacts.orgId, tenant.orgId),
+        eq(contacts.businessId, tenant.businessId),
+      ),
     )
     .get();
 }
@@ -174,7 +200,7 @@ export async function getContactInTenant(
  */
 export async function createContact(
   db: TavelleDb,
-  tenant: TenantContext,
+  tenant: BusinessTenantContext,
   input: ContactsCreateInput,
 ) {
   const customer = await getCustomerInTenant(db, tenant, input.clientId);
@@ -187,6 +213,7 @@ export async function createContact(
   const insert = db.insert(contacts).values({
     id,
     orgId: tenant.orgId,
+    businessId: tenant.businessId,
     clientId: input.clientId,
     name: input.name,
     email: input.email ?? null,
@@ -204,6 +231,7 @@ export async function createContact(
         .where(
           and(
             eq(contacts.orgId, tenant.orgId),
+            eq(contacts.businessId, tenant.businessId),
             eq(contacts.clientId, input.clientId),
             eq(contacts.isPrimary, true),
           ),
@@ -234,6 +262,7 @@ export async function createContact(
     contact: {
       id,
       orgId: tenant.orgId,
+      businessId: tenant.businessId,
       clientId: input.clientId,
       name: input.name,
       email: input.email ?? null,
@@ -251,7 +280,7 @@ export async function createContact(
  */
 export async function updateContact(
   db: TavelleDb,
-  tenant: TenantContext,
+  tenant: BusinessTenantContext,
   contactId: string,
   input: ContactsUpdateInput,
 ) {
@@ -272,7 +301,11 @@ export async function updateContact(
     .update(contacts)
     .set(next)
     .where(
-      and(eq(contacts.id, contactId), eq(contacts.orgId, tenant.orgId)),
+      and(
+        eq(contacts.id, contactId),
+        eq(contacts.orgId, tenant.orgId),
+        eq(contacts.businessId, tenant.businessId),
+      ),
     );
 
   try {
@@ -283,6 +316,7 @@ export async function updateContact(
         .where(
           and(
             eq(contacts.orgId, tenant.orgId),
+            eq(contacts.businessId, tenant.businessId),
             eq(contacts.clientId, existing.clientId),
             eq(contacts.isPrimary, true),
             ne(contacts.id, contactId),
@@ -314,6 +348,7 @@ export async function updateContact(
     contact: {
       id: existing.id,
       orgId: existing.orgId,
+      businessId: existing.businessId,
       clientId: existing.clientId,
       name: next.name,
       email: next.email,
@@ -327,7 +362,7 @@ export async function updateContact(
 
 export async function listClientNotes(
   db: TavelleDb,
-  tenant: TenantContext,
+  tenant: BusinessTenantContext,
   clientId: string,
 ) {
   const customer = await getCustomerInTenant(db, tenant, clientId);
@@ -339,6 +374,7 @@ export async function listClientNotes(
     .where(
       and(
         eq(clientNotes.orgId, tenant.orgId),
+        eq(clientNotes.businessId, tenant.businessId),
         eq(clientNotes.clientId, clientId),
       ),
     )
@@ -349,7 +385,7 @@ export async function listClientNotes(
 /** Domain op: clientNotes.create */
 export async function createClientNote(
   db: TavelleDb,
-  tenant: TenantContext,
+  tenant: BusinessTenantContext,
   input: ClientNotesCreateInput,
 ) {
   const customer = await getCustomerInTenant(db, tenant, input.clientId);
@@ -360,6 +396,7 @@ export async function createClientNote(
   await db.insert(clientNotes).values({
     id,
     orgId: tenant.orgId,
+    businessId: tenant.businessId,
     clientId: input.clientId,
     authorUserId: tenant.actorUserId,
     body: input.body,
@@ -378,6 +415,7 @@ export async function createClientNote(
     note: {
       id,
       orgId: tenant.orgId,
+      businessId: tenant.businessId,
       clientId: input.clientId,
       body: input.body,
       authorUserId: tenant.actorUserId,

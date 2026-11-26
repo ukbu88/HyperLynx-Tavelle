@@ -9,6 +9,7 @@ import { orgRoutes } from "./modules/orgs/routes.js";
 import { membershipRoutes } from "./modules/memberships/routes.js";
 import { noteRoutes } from "./modules/notes/routes.js";
 import { crmRoutes } from "./modules/crm/routes.js";
+import { businessRoutes } from "./modules/businesses/routes.js";
 import { seedRoutes } from "./modules/seed/routes.js";
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -26,6 +27,7 @@ app.route("/api", healthRoutes);
 app.route("/api", orgRoutes);
 app.route("/api", membershipRoutes);
 app.route("/api", noteRoutes);
+app.route("/api", businessRoutes);
 app.route("/api", crmRoutes);
 app.route("/api", seedRoutes);
 

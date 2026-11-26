@@ -11,7 +11,7 @@ import {
 } from "@tavelle/contracts";
 import type { AppVariables, Env } from "../../env.js";
 import { requireSessionUser } from "../../middleware/session.js";
-import { requireTenant } from "../../middleware/tenant.js";
+import { requireBusinessTenant } from "../../middleware/tenant.js";
 import { can } from "../permissions/can.js";
 import { getDb } from "../orgs/service.js";
 import {
@@ -31,6 +31,7 @@ export const crmRoutes = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 function serializeCustomer(row: {
   id: string;
   orgId: string;
+  businessId: string;
   name: string;
   status: string;
   createdAt: Date;
@@ -39,6 +40,7 @@ function serializeCustomer(row: {
   return CustomerSchema.parse({
     id: row.id,
     orgId: row.orgId,
+    businessId: row.businessId,
     name: row.name,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
@@ -49,6 +51,7 @@ function serializeCustomer(row: {
 function serializeContact(row: {
   id: string;
   orgId: string;
+  businessId: string;
   clientId: string;
   name: string;
   email: string | null;
@@ -60,6 +63,7 @@ function serializeContact(row: {
   return ContactSchema.parse({
     id: row.id,
     orgId: row.orgId,
+    businessId: row.businessId,
     clientId: row.clientId,
     name: row.name,
     email: row.email,
@@ -73,6 +77,7 @@ function serializeContact(row: {
 function serializeClientNote(row: {
   id: string;
   orgId: string;
+  businessId: string;
   clientId: string;
   body: string;
   authorUserId: string | null;
@@ -81,6 +86,7 @@ function serializeClientNote(row: {
   return ClientNoteSchema.parse({
     id: row.id,
     orgId: row.orgId,
+    businessId: row.businessId,
     clientId: row.clientId,
     body: row.body,
     authorUserId: row.authorUserId,
@@ -88,12 +94,16 @@ function serializeClientNote(row: {
   });
 }
 
+function noBusiness() {
+  return { error: "no_active_business" as const };
+}
+
 /** Domain op: customers.list */
 crmRoutes.get("/customers", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  const tenant = requireTenant(c);
-  if (!tenant) return c.json({ error: "no_active_org" }, 400);
+  const tenant = requireBusinessTenant(c);
+  if (!tenant) return c.json(noBusiness(), 400);
   if (!can(tenant.role, "client:read")) return c.json({ error: "forbidden" }, 403);
 
   const db = getDb(c.env);
@@ -108,8 +118,8 @@ crmRoutes.get("/customers", async (c) => {
 crmRoutes.post("/customers", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  const tenant = requireTenant(c);
-  if (!tenant) return c.json({ error: "no_active_org" }, 400);
+  const tenant = requireBusinessTenant(c);
+  if (!tenant) return c.json(noBusiness(), 400);
   if (!can(tenant.role, "client:write")) return c.json({ error: "forbidden" }, 403);
 
   const parsed = CustomersCreateInputSchema.safeParse(await c.req.json());
@@ -117,7 +127,7 @@ crmRoutes.post("/customers", async (c) => {
     return c.json({ error: "invalid_body", details: parsed.error.flatten() }, 400);
   }
 
-  // Ignore any forged orgId in body — tenant is session/cookie derived.
+  // Ignore any forged orgId/businessId in body — tenant is session/cookie derived.
   const db = getDb(c.env);
   const customer = await createCustomer(db, tenant, parsed.data);
   return c.json({ op: "customers.create", customer: serializeCustomer(customer) }, 201);
@@ -127,13 +137,13 @@ crmRoutes.post("/customers", async (c) => {
 crmRoutes.get("/customers/:id", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  const tenant = requireTenant(c);
-  if (!tenant) return c.json({ error: "no_active_org" }, 400);
+  const tenant = requireBusinessTenant(c);
+  if (!tenant) return c.json(noBusiness(), 400);
   if (!can(tenant.role, "client:read")) return c.json({ error: "forbidden" }, 403);
 
   const db = getDb(c.env);
   const customer = await getCustomerInTenant(db, tenant, c.req.param("id"));
-  // IDOR: cross-tenant → 404 (do not leak existence)
+  // IDOR: cross-business / cross-tenant → 404 (do not leak existence)
   if (!customer) return c.json({ error: "not_found" }, 404);
   return c.json({ op: "customers.get", customer: serializeCustomer(customer) });
 });
@@ -142,8 +152,8 @@ crmRoutes.get("/customers/:id", async (c) => {
 crmRoutes.patch("/customers/:id", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  const tenant = requireTenant(c);
-  if (!tenant) return c.json({ error: "no_active_org" }, 400);
+  const tenant = requireBusinessTenant(c);
+  if (!tenant) return c.json(noBusiness(), 400);
   if (!can(tenant.role, "client:write")) return c.json({ error: "forbidden" }, 403);
 
   const parsed = CustomersUpdateInputSchema.safeParse(await c.req.json());
@@ -161,8 +171,8 @@ crmRoutes.patch("/customers/:id", async (c) => {
 crmRoutes.get("/customers/:id/contacts", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  const tenant = requireTenant(c);
-  if (!tenant) return c.json({ error: "no_active_org" }, 400);
+  const tenant = requireBusinessTenant(c);
+  if (!tenant) return c.json(noBusiness(), 400);
   if (!can(tenant.role, "client:read")) return c.json({ error: "forbidden" }, 403);
 
   const db = getDb(c.env);
@@ -178,8 +188,8 @@ crmRoutes.get("/customers/:id/contacts", async (c) => {
 crmRoutes.post("/contacts", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  const tenant = requireTenant(c);
-  if (!tenant) return c.json({ error: "no_active_org" }, 400);
+  const tenant = requireBusinessTenant(c);
+  if (!tenant) return c.json(noBusiness(), 400);
   if (!can(tenant.role, "client:write")) return c.json({ error: "forbidden" }, 403);
 
   const parsed = ContactsCreateInputSchema.safeParse(await c.req.json());
@@ -205,8 +215,8 @@ crmRoutes.post("/contacts", async (c) => {
 crmRoutes.patch("/contacts/:id", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  const tenant = requireTenant(c);
-  if (!tenant) return c.json({ error: "no_active_org" }, 400);
+  const tenant = requireBusinessTenant(c);
+  if (!tenant) return c.json(noBusiness(), 400);
   if (!can(tenant.role, "client:write")) return c.json({ error: "forbidden" }, 403);
 
   const parsed = ContactsUpdateInputSchema.safeParse(await c.req.json());
@@ -230,8 +240,8 @@ crmRoutes.patch("/contacts/:id", async (c) => {
 crmRoutes.get("/customers/:id/notes", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  const tenant = requireTenant(c);
-  if (!tenant) return c.json({ error: "no_active_org" }, 400);
+  const tenant = requireBusinessTenant(c);
+  if (!tenant) return c.json(noBusiness(), 400);
   if (!can(tenant.role, "client:read")) return c.json({ error: "forbidden" }, 403);
 
   const db = getDb(c.env);
@@ -247,8 +257,8 @@ crmRoutes.get("/customers/:id/notes", async (c) => {
 crmRoutes.post("/client-notes", async (c) => {
   const user = requireSessionUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
-  const tenant = requireTenant(c);
-  if (!tenant) return c.json({ error: "no_active_org" }, 400);
+  const tenant = requireBusinessTenant(c);
+  if (!tenant) return c.json(noBusiness(), 400);
   if (!can(tenant.role, "client:write")) return c.json({ error: "forbidden" }, 403);
 
   const parsed = ClientNotesCreateInputSchema.safeParse(await c.req.json());
