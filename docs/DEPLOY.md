@@ -61,6 +61,21 @@ curl -sS https://tavelle-api-staging.ukbu88.workers.dev/api/health
 
 Expect `bindings.d1` / `bindings.r2` true after migrate. Auth UI: `/sign-in`, `/sign-up`, `/app`.
 
+## Magic link (platform admin) — staging today
+
+Staging `PLATFORM_ADMIN_EMAILS` is `ukbu88@proton.me`. No `EMAIL_API_KEY` is set, so links are **not** delivered to Proton yet — they are logged as `email_stub` by the Worker.
+
+1. Open https://tavelle-api-staging.ukbu88.workers.dev/sign-in → **Magic link** tab.  
+2. Enter `ukbu88@proton.me` → **Send magic link**.  
+3. Tail logs in another terminal:
+   ```bash
+   cd apps/api && pnpm exec wrangler tail --env staging
+   ```
+4. Copy the magic-link URL from the `email_stub` log line and open it in the browser (verifies email ownership).  
+5. Go to `/app` — platform-admin UI (provision / seed orgs) appears only after `emailVerified`.
+
+When Resend/Postmark is wired later: `wrangler secret put EMAIL_API_KEY --env staging` and set `EMAIL_FROM` — then the same Sign-in flow delivers to the Proton inbox.
+
 ## Prince follow-ups
 
 1. Confirm `BETTER_AUTH_SECRET` is set on staging (rotate anytime with `wrangler secret put`).  

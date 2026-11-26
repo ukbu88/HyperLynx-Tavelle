@@ -5,8 +5,10 @@ BETTER_AUTH_URL=http://127.0.0.1:5173
 BETTER_AUTH_SECRET=dev-only-tavelle-better-auth-secret-change-me
 
 # Comma-separated emails allowed to provision organisations (invite-only ops).
-PLATFORM_ADMIN_EMAILS=you@example.com
+# Must match a verified Better Auth user (magic link) before privileges apply.
+PLATFORM_ADMIN_EMAILS=ukbu88@proton.me
 
-# Optional transactional email — leave unset to log magic/invite links.
+# Optional transactional email — leave unset to log magic/invite links to Worker logs.
 # EMAIL_FROM=noreply@example.com
 # EMAIL_API_KEY=
+
