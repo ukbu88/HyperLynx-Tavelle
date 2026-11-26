@@ -24,11 +24,13 @@ Copy the D1 `database_id` into `wrangler.toml` → `[env.staging]` → replace `
 ```bash
 # from repo root
 pnpm --filter @tavelle/web build
-pnpm db:migrate:remote
+pnpm db:migrate:remote   # applies to D1 database_name tavelle-staging (--env staging)
 pnpm deploy:staging
 ```
 
 Staging Worker name: `tavelle-api-staging` on `*.workers.dev`. SPA assets are bound on the same Worker (`/api/*` runs the Worker first; other routes serve the SPA).
+
+`db:migrate:remote` targets **`tavelle-staging`** (not the local `tavelle` name). Local migrate still uses `tavelle`.
 
 ## Verify
 

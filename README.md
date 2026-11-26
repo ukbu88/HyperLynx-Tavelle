@@ -90,7 +90,7 @@ Full checklist: [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 5. Build + migrate + deploy:
    ```bash
    pnpm --filter @tavelle/web build
-   pnpm db:migrate:remote
+   pnpm db:migrate:remote   # D1 name: tavelle-staging (--env staging)
    pnpm deploy:staging
    ```
 6. Confirm `https://tavelle-api-staging.<your-subdomain>.workers.dev/api/health`.
