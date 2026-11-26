@@ -32,7 +32,7 @@ vars = { ENVIRONMENT = "staging" }
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "tavelle-staging"
-database_id = "REPLACE_WITH_STAGING_D1_ID"
+database_id = "5b35d4cb-80dc-40a7-ac67-a37122a653b9"
 migrations_dir = "../../packages/db/migrations"
 
 [[env.staging.r2_buckets]]
